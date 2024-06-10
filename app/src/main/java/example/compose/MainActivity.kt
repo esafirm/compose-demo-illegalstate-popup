@@ -14,13 +14,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val component = DaggerAppComponent.create() as MainDepsProvider
-        val mainDeps = component.getMainDeps()
+        val component = AppComponentInstance.create(this) as MainDepsProvider
+        val mainDependencies = component.getMainDeps()
 
         val pages = listOf(
-            mainDeps.greetingPage,
-            mainDeps.sPageFirst,
-            mainDeps.sPageSecond
+            mainDependencies.greetingPage,
+            mainDependencies.sPageFirst,
+            mainDependencies.sPageSecond
         )
 
         setContent {
