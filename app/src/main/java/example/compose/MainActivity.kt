@@ -1,26 +1,41 @@
 package example.compose
 
 import android.os.Bundle
-import android.view.ViewGroup
 import androidx.activity.ComponentActivity
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import androidx.activity.compose.setContent
+import com.squareup.anvil.annotations.ContributesTo
+import example.compose.pager.Page
+import example.compose.pager.PagerSample
+import javax.inject.Inject
+import javax.inject.Named
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val items = (0 until 100).map { "Item $it" }
-        val view = RecyclerView(this).apply {
-            adapter = SimpleAdapter(items)
-            layoutManager = LinearLayoutManager(this@MainActivity)
-        }
+        val component = DaggerAppComponent.create() as MainDepsProvider
+        val mainDeps = component.getMainDeps()
 
-        setContentView(view.apply {
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-        })
+        val pages = listOf(
+            mainDeps.greetingPage,
+            mainDeps.sPageFirst,
+            mainDeps.sPageSecond
+        )
+
+        setContent {
+            PagerSample(items = pages)
+        }
     }
 }
+
+@ContributesTo(AppScope::class)
+interface MainDepsProvider {
+    fun getMainDeps(): MainDependencies
+}
+
+class MainDependencies @Inject constructor(
+    @Named("GreetingPage") val greetingPage: Page,
+    @Named("SimplePageFirst") val sPageFirst: Page,
+    @Named("SimplePageSecond") val sPageSecond: Page
+)
