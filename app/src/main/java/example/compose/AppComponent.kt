@@ -18,7 +18,7 @@ import example.compose.pager.PageSubComponent
 )
 interface AppComponent {
 
-    fun pageComponentFactor(): PageSubComponent.Factory
+    fun pageComponentFactory(): PageSubComponent.Factory
 
     @Component.Factory
     interface Factory {

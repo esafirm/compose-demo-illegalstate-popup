@@ -1,7 +1,5 @@
 package example.compose.pager
 
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultCaller
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.launch
@@ -15,21 +13,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.coroutineScope
+import com.squareup.anvil.annotations.ContributesBinding
 import com.squareup.anvil.annotations.ContributesTo
-import com.squareup.anvil.annotations.MergeSubcomponent
 import dagger.Binds
-import dagger.BindsInstance
 import dagger.Module
 import dagger.Provides
-import dagger.Reusable
-import dagger.Subcomponent
 import dagger.multibindings.ClassKey
 import dagger.multibindings.IntoMap
 import example.compose.AppScope
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -87,11 +78,6 @@ class GreetingViewModel @Inject constructor(
 class GreetingPage : CommonPage() {
     @Composable
     override fun Content() {
-        val launcher =
-            rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) {
-                println("Composable:: take picture result: ${it.hashCode()}")
-            }
-
         val vm = rememberViewModel<GreetingViewModel>()
         vm.greet()
 
@@ -106,9 +92,6 @@ class GreetingPage : CommonPage() {
 
             Button(onClick = vm::takePicture) {
                 Text(text = "Take Picture")
-            }
-            Button(onClick = { launcher.launch() }) {
-                Text(text = "Take Picture in Compose")
             }
             Button(onClick = vm::callLongTask) {
                 Text(text = "Call Long Task")
@@ -125,11 +108,6 @@ class GreetingPage : CommonPage() {
 @Module
 interface GreetingPageModule {
 
-    @Binds
-    @IntoMap
-    @ClassKey(GreetingViewModel::class)
-    fun bindViewModel(impl: GreetingViewModel): Any
-
     companion object {
 
         @Provides
@@ -138,63 +116,16 @@ interface GreetingPageModule {
     }
 }
 
-/* --------------------------------------------------- */
-/* > DI - Subcomponent */
-/* --------------------------------------------------- */
-
-interface PageScope
-
-typealias PageVmFactory = Map<@JvmSuppressWildcards Class<*>, Any>
-
-@ContributesTo(PageScope::class)
-interface PageVmFactoryProvider {
-    fun getFactory(): PageVmFactory
-}
-
+/**
+ * We're using this for now
+ * because using Any::class as `boundType` resulting a compile error in Anvil
+ */
 @ContributesTo(PageScope::class)
 @Module
-class PageActivityResultCallerModule {
+interface PageVmModule {
 
-    @Named("PageCaller")
-    @Reusable
-    @Provides
-    fun provideActivityResultCaller(
-        activity: ComponentActivity,
-        idProvider: ResultCallerIdProvider,
-        registry: ResultLauncherRegistry,
-    ): ActivityResultCaller {
-        return ComposePageActivityResultCaller(
-            activity.activityResultRegistry,
-            idProvider,
-            registry
-        )
-    }
-}
-
-@ContributesTo(PageScope::class)
-@Module
-class DefaultPageDependencies {
-
-    @Provides
-    fun provideLifecycle(lifecycleOwner: LifecycleOwner): Lifecycle {
-        return lifecycleOwner.lifecycle
-    }
-
-    @Provides
-    fun provideLifecycleScope(lifecycleOwner: LifecycleOwner): CoroutineScope {
-        return lifecycleOwner.lifecycle.coroutineScope
-    }
-}
-
-@MergeSubcomponent(PageScope::class)
-interface PageSubComponent {
-
-    @Subcomponent.Factory
-    interface Factory {
-        fun create(
-            @BindsInstance idProvider: ResultCallerIdProvider,
-            @BindsInstance registry: ResultLauncherRegistry,
-            @BindsInstance lifecycleOwner: LifecycleOwner,
-        ): PageSubComponent
-    }
+    @Binds
+    @IntoMap
+    @ClassKey(GreetingViewModel::class)
+    fun bindViewModel(impl: GreetingViewModel): Any
 }

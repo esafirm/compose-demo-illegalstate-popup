@@ -5,9 +5,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LifecycleRegistry
 import example.compose.AppComponentInstance
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
@@ -26,7 +23,7 @@ abstract class CommonPage : Page {
 }
 
 @Composable
-fun <T : Any> CommonPage.rememberViewModel(clazz: Class<T>): T {
+fun rememberPageComponent(): PageSubComponent {
     val prefixIdentifier = rememberSaveable { UUID.randomUUID().toString() }
     val idProvider = remember { IncrementalIdProvider(prefixIdentifier) }
     val callerRegistry = remember { SimpleResultLauncherRegistry() }
@@ -40,50 +37,26 @@ fun <T : Any> CommonPage.rememberViewModel(clazz: Class<T>): T {
     val lifecycleOwner = rememberLifecycleOwner()
 
     return remember {
-        val component = AppComponentInstance.get().pageComponentFactor().create(
+        AppComponentInstance.get().pageComponentFactory().create(
             idProvider = idProvider,
             registry = callerRegistry,
             lifecycleOwner = lifecycleOwner
         )
-        val vmProvider = component as PageVmFactoryProvider
+    }
+}
+
+@Suppress("UnusedReceiverParameter")
+@Composable
+fun <T : Any> CommonPage.rememberViewModel(clazz: Class<T>): T {
+    val pageComponent = rememberPageComponent()
+
+    return remember {
+        val vmProvider = pageComponent as PageVmFactoryProvider
         val vm = vmProvider.getFactory()[clazz]
 
         @Suppress("UNCHECKED_CAST")
         vm as T
     }
-}
-
-/* --------------------------------------------------- */
-/* > Lifecycle */
-/* --------------------------------------------------- */
-
-class ComposeLifecycleOwner : LifecycleOwner {
-
-    private val lifecycleRegistry: LifecycleRegistry = LifecycleRegistry(this)
-    override val lifecycle: Lifecycle = lifecycleRegistry
-
-    fun moveToState(state: Lifecycle.State) {
-        lifecycleRegistry.currentState = state
-    }
-}
-
-@Composable
-fun rememberLifecycleOwner(): ComposeLifecycleOwner {
-    val lifecycleOwner = remember {
-        ComposeLifecycleOwner().apply {
-            moveToState(Lifecycle.State.INITIALIZED)
-        }
-    }
-
-    DisposableEffect(Unit) {
-        lifecycleOwner.moveToState(Lifecycle.State.STARTED)
-        lifecycleOwner.moveToState(Lifecycle.State.RESUMED)
-        onDispose {
-            lifecycleOwner.moveToState(Lifecycle.State.DESTROYED)
-        }
-    }
-
-    return lifecycleOwner
 }
 
 /* --------------------------------------------------- */
