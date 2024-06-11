@@ -5,6 +5,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import example.compose.AppComponentInstance
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
@@ -18,26 +21,69 @@ abstract class CommonPage : Page {
 
     @Composable
     inline fun <reified T : Any> rememberViewModel(): T {
-        val prefixIdentifier = rememberSaveable { UUID.randomUUID().toString() }
-        val idProvider = remember { IncrementalIdProvider(prefixIdentifier) }
-        val callerRegistry = remember { SimpleResultLauncherRegistry() }
+        return rememberViewModel(T::class.java)
+    }
+}
 
-        DisposableEffect(prefixIdentifier, idProvider) {
-            onDispose {
-                callerRegistry.unregister()
-            }
-        }
+@Composable
+fun <T : Any> CommonPage.rememberViewModel(clazz: Class<T>): T {
+    val prefixIdentifier = rememberSaveable { UUID.randomUUID().toString() }
+    val idProvider = remember { IncrementalIdProvider(prefixIdentifier) }
+    val callerRegistry = remember { SimpleResultLauncherRegistry() }
 
-        return remember {
-            val component = AppComponentInstance.get().pageComponentFactor().create(
-                idProvider,
-                callerRegistry
-            )
-            val vmProvider = component as PageVmFactoryProvider
-            val vm = vmProvider.getFactory()[T::class.java]
-            vm as T
+    DisposableEffect(prefixIdentifier, idProvider) {
+        onDispose {
+            callerRegistry.unregister()
         }
     }
+
+    val lifecycleOwner = rememberLifecycleOwner()
+
+    return remember {
+        val component = AppComponentInstance.get().pageComponentFactor().create(
+            idProvider = idProvider,
+            registry = callerRegistry,
+            lifecycleOwner = lifecycleOwner
+        )
+        val vmProvider = component as PageVmFactoryProvider
+        val vm = vmProvider.getFactory()[clazz]
+
+        @Suppress("UNCHECKED_CAST")
+        vm as T
+    }
+}
+
+/* --------------------------------------------------- */
+/* > Lifecycle */
+/* --------------------------------------------------- */
+
+class ComposeLifecycleOwner : LifecycleOwner {
+
+    private val lifecycleRegistry: LifecycleRegistry = LifecycleRegistry(this)
+    override val lifecycle: Lifecycle = lifecycleRegistry
+
+    fun moveToState(state: Lifecycle.State) {
+        lifecycleRegistry.currentState = state
+    }
+}
+
+@Composable
+fun rememberLifecycleOwner(): ComposeLifecycleOwner {
+    val lifecycleOwner = remember {
+        ComposeLifecycleOwner().apply {
+            moveToState(Lifecycle.State.INITIALIZED)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        lifecycleOwner.moveToState(Lifecycle.State.STARTED)
+        lifecycleOwner.moveToState(Lifecycle.State.RESUMED)
+        onDispose {
+            lifecycleOwner.moveToState(Lifecycle.State.DESTROYED)
+        }
+    }
+
+    return lifecycleOwner
 }
 
 /* --------------------------------------------------- */

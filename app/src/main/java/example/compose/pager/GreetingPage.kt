@@ -15,6 +15,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.coroutineScope
 import com.squareup.anvil.annotations.ContributesTo
 import com.squareup.anvil.annotations.MergeSubcomponent
 import dagger.Binds
@@ -26,6 +29,10 @@ import dagger.Subcomponent
 import dagger.multibindings.ClassKey
 import dagger.multibindings.IntoMap
 import example.compose.AppScope
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Named
 
@@ -41,6 +48,7 @@ class GreetingViewModel @Inject constructor(
     private val generator: GreetingGenerator,
     private val displayer: GreetingDisplayer,
     @Named("PageCaller") caller: ActivityResultCaller,
+    private val scope: CoroutineScope,
 ) {
 
     private val launcher =
@@ -58,6 +66,17 @@ class GreetingViewModel @Inject constructor(
 
     fun takePicture() {
         launcher.launch()
+    }
+
+    fun callLongTask(delayInMs: Long = 10_000L) {
+        val job = scope.launch {
+            println("VM:: Long task started - delay: $delayInMs")
+            delay(delayInMs)
+            println("VM:: Long task completed inside launch")
+        }
+        job.invokeOnCompletion { cause ->
+            println("VM:: Long task completed cause: $cause")
+        }
     }
 }
 
@@ -84,11 +103,15 @@ class GreetingPage : CommonPage() {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(text = "Check your Logcat!")
+
             Button(onClick = vm::takePicture) {
                 Text(text = "Take Picture")
             }
             Button(onClick = { launcher.launch() }) {
                 Text(text = "Take Picture in Compose")
+            }
+            Button(onClick = vm::callLongTask) {
+                Text(text = "Call Long Task")
             }
         }
     }
@@ -148,6 +171,21 @@ class PageActivityResultCallerModule {
     }
 }
 
+@ContributesTo(PageScope::class)
+@Module
+class DefaultPageDependencies {
+
+    @Provides
+    fun provideLifecycle(lifecycleOwner: LifecycleOwner): Lifecycle {
+        return lifecycleOwner.lifecycle
+    }
+
+    @Provides
+    fun provideLifecycleScope(lifecycleOwner: LifecycleOwner): CoroutineScope {
+        return lifecycleOwner.lifecycle.coroutineScope
+    }
+}
+
 @MergeSubcomponent(PageScope::class)
 interface PageSubComponent {
 
@@ -156,6 +194,7 @@ interface PageSubComponent {
         fun create(
             @BindsInstance idProvider: ResultCallerIdProvider,
             @BindsInstance registry: ResultLauncherRegistry,
+            @BindsInstance lifecycleOwner: LifecycleOwner,
         ): PageSubComponent
     }
 }
